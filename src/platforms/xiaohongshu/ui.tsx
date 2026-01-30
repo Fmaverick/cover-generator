@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { xhsConfig, xhsTemplates, xhsDefaultConfig, templateColorPresets } from './config';
 import { xhsRenderer } from './renderer';
 import { PageData } from '../../types';
@@ -16,48 +16,71 @@ type XhsTemplateId = 'ins' | 'memo' | 'article' | 'book' | 'notes' | 'poster';
  * 小红书平台 UI 组件
  */
 export function XhsPlatform() {
-  const [title, setTitle] = useState('经历过异常体验的女性怎样\n知道自己的心理健康和\n神经系统到底有多偏离？');
-  const [content, setContent] = useState(`这是一个非常深刻且具有实操性的问题。对于经历过"[异常体验]"（如政治迫害、大规模网暴、冤假错案、系统性背叛）的高智商女性来说，常规的心理健康标准已经失效了。
-
-你的神经系统为了在极端环境中生存，已经进行了"[军事化重组]"。你不能用"和平年代"的标准来衡量一个刚从"战场"归来的人。`);
-  const [config, setConfig] = useState<typeof xhsDefaultConfig & { template: XhsTemplateId }>({
-    ...xhsDefaultConfig,
-    template: 'article',
-  });
+  const [title, setTitle] = useState('小红书封面标题');
+  const [content, setContent] = useState('这是正文内容。支持[高亮标记]语法，可以突出重点内容。\n\n第二段内容会继续显示在后续页面中。[自动分页]功能会智能切分长文本。');
+  const [config, setConfig] = useState(xhsDefaultConfig);
   const [images, setImages] = useState<any[]>([]);
   const [pagesData, setPagesData] = useState<PageData[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
+  const renderTimeoutRef = useRef<number | null>(null);
 
-  // 更新配色方案
+  // 更新配色方案 (使用 useRef 避免无限循环)
+  const isInitializedRef = useRef(false);
   useEffect(() => {
-    const preset = templateColorPresets[config.template];
-    if (preset) {
-      setConfig((prev) => ({
-        ...prev,
-        bgColor: preset.bgColor,
-        textColor: preset.textColor,
-        highlightColor: preset.highlightColor,
-      }));
+    if (!isInitializedRef.current) {
+      const preset = templateColorPresets[config.template];
+      if (preset) {
+        setConfig((prev) => ({
+          ...prev,
+          bgColor: preset.bgColor,
+          textColor: preset.textColor,
+          highlightColor: preset.highlightColor,
+        }));
+      }
+      isInitializedRef.current = true;
     }
   }, [config.template]);
+
+  // 优化的 canvas ref 回调
+  const setCanvasRef = useCallback((el: HTMLCanvasElement | null, index: number) => {
+    canvasRefs.current[index] = el;
+  }, []);
+
+  // 渲染单个页面到 canvas
+  const renderPageToCanvas = useCallback((page: PageData, index: number) => {
+    const canvas = canvasRefs.current[index];
+    if (canvas) {
+      xhsRenderer.renderPage(canvas, page, config);
+    }
+  }, [config]);
 
   // 计算分页
   useEffect(() => {
     const pages = xhsRenderer.calculatePages(title, content, config, images);
-    setPagesData(pages);
-  }, [title, content, config.template, config.fontSizeScale, images]);
+    // 限制预览页面数量，避免生成过多
+    setPagesData(pages.slice(0, 10));
 
-  // 渲染预览
-  useEffect(() => {
-    pagesData.forEach((page, index) => {
-      const canvas = canvasRefs.current[index];
-      if (canvas) {
-        xhsRenderer.renderPage(canvas, page, config);
-      }
+    // 清除之前的定时器
+    if (renderTimeoutRef.current) {
+      clearTimeout(renderTimeoutRef.current);
+    }
+
+    // 延迟渲染，避免重复渲染
+    renderTimeoutRef.current = setTimeout(() => {
+      pages.forEach((page, index) => {
+        renderPageToCanvas(page, index);
+      });
     });
-  }, [pagesData, config]);
+
+    // 清理函数
+    return () => {
+      if (renderTimeoutRef.current) {
+        clearTimeout(renderTimeoutRef.current);
+      }
+    };
+  }, [title, content, config.template, config.fontSizeScale, images, renderPageToCanvas]);
 
   // 文件上传
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,7 +120,7 @@ export function XhsPlatform() {
   };
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col md:flex-row h-screen">
       {/* 左侧控制面板 */}
       <div className="flex flex-col w-full p-6 space-y-6 overflow-y-auto bg-white border-r border-gray-200 md:w-1/3 scrollbar-hide">
         <div>
@@ -112,7 +135,7 @@ export function XhsPlatform() {
               key={t.id}
               onClick={() => setConfig((prev) => ({ ...prev, template: t.id as any }))}
               className={`p-3 border rounded-xl text-left transition-all ${
-                config.template === t.id ? 'bg-gray-900 text-white ring-2 ring-gray-900' : 'hover:bg-gray-50 text-gray-600'
+                config.template === t.id ? 'bg-red-500 text-white ring-2 ring-red-500' : 'hover:bg-red-50 text-gray-600'
               }`}
             >
               <div className="text-sm font-bold">{t.name}</div>
@@ -189,7 +212,7 @@ export function XhsPlatform() {
         {/* 图片上传 */}
         <div className="space-y-3">
           <label className="block text-xs font-bold text-gray-500">背景图片</label>
-          <input type="file" onChange={handleFileUpload} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" accept="image/*" multiple />
+          <input type="file" onChange={handleFileUpload} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100" accept="image/*" multiple />
           {images.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {images.map((img) => (
@@ -223,7 +246,7 @@ export function XhsPlatform() {
             </span>
             <div className="w-[360px] aspect-[9/16] bg-white shadow-2xl rounded-2xl overflow-hidden ring-4 ring-white relative">
               <canvas
-                ref={(el) => (canvasRefs.current[idx] = el)}
+                ref={(el) => setCanvasRef(el, idx)}
                 width={xhsConfig.outputSize.width}
                 height={xhsConfig.outputSize.height}
                 className="w-full h-full object-contain"

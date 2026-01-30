@@ -567,20 +567,31 @@ export class XhsRenderer {
     // 处理剩余正文
     let currentPageLines: any[] = [];
     let currentY = 0;
+    const MAX_PAGES = 50;  // 防止生成过多页面
+    let pageCount = 0;
 
-    while (remainingLines.length > 0) {
+    while (remainingLines.length > 0 && pageCount < MAX_PAGES) {
       const line = remainingLines.shift()!;
+
+      // 跳过连续的空行，避免生成过多空白页面
+      if (line.isEmpty && currentPageLines.length === 0) {
+        continue;
+      }
+
       const h = line.isEmpty ? lineHeight * 0.5 : lineHeight;
 
       if (currentY + h > safeHeight - 100) {
-        pages.push({
-          type: 'content',
-          lines: currentPageLines,
-          pageIndex: pages.length + 1,
-          bgImage: images.length > 0 ? images[(pages.length) % images.length] : null,
-        });
-        currentPageLines = [];
-        currentY = 0;
+        if (currentPageLines.length > 0) {
+          pages.push({
+            type: 'content',
+            lines: currentPageLines,
+            pageIndex: pages.length + 1,
+            bgImage: images.length > 0 ? images[(pages.length) % images.length] : null,
+          });
+          pageCount++;
+          currentPageLines = [];
+          currentY = 0;
+        }
       }
 
       currentPageLines.push(line);
