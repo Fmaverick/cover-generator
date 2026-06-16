@@ -1,5 +1,7 @@
 # cover-generator
 
+![cover-generator preview](.backup/preview.png)
+
 **AI-assisted cover generation for Xiaohongshu creators.**  
 **面向小红书创作者的 AI 辅助封面生成工具。**
 
@@ -17,6 +19,15 @@ Instead of optimizing for raw image generation, this project focuses on operatio
   在不同视觉模板之间快速切换
 - export a full set of images in one pass  
   一次性导出整套图片素材
+
+## Who this is for / 适合谁
+
+- creators publishing on Xiaohongshu or similar visual-first platforms  
+  在小红书或类似视觉优先平台持续发布的创作者
+- operators who need speed, consistency, and reusable templates  
+  需要速度、一致性和可复用模板的内容操盘手
+- people who care about turning taste into workflow leverage  
+  希望把审美判断沉淀成工作流杠杆的人
 
 ## Why this exists / 为什么做它
 
