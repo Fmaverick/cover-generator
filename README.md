@@ -1,3 +1,5 @@
+
+
 # cover-generator
 
 ![cover-generator preview](.backup/preview.png)
@@ -57,6 +59,7 @@ That is the bet behind `cover-generator`.
 - Tailwind CSS
 - Canvas API
 - JSZip
+- Vite
 
 ## Run locally / 本地运行
 
